@@ -64,7 +64,42 @@ func (s *AnyTLS) Dial(network, addr string) (net.Conn, error) {
 }
 
 func (s *AnyTLS) DialUDP(network, addr string) (net.PacketConn, error) {
-	return nil, proxy.ErrNotSupported
+	if network != "udp" && network != "udp4" && network != "udp6" {
+		return nil, proxy.ErrNotSupported
+	}
+	target := socks.ParseAddr(addr)
+	if target == nil {
+		return nil, fmt.Errorf("[anytls] invalid target address: %s", addr)
+	}
+	raw := socks.ParseAddr(net.JoinHostPort(uotV2MagicHost, "0"))
+	if raw == nil {
+		return nil, fmt.Errorf("[anytls] invalid udp-over-tcp target address")
+	}
+	ss, err := s.newClientSession()
+	if err != nil {
+		return nil, err
+	}
+	st, err := ss.openStream()
+	if err != nil {
+		_ = ss.Close()
+		return nil, err
+	}
+	if _, err := st.Write(raw); err != nil {
+		_ = st.Close()
+		_ = ss.Close()
+		return nil, err
+	}
+	if err := writeUOTV2Request(st, target); err != nil {
+		_ = st.Close()
+		_ = ss.Close()
+		return nil, err
+	}
+	if err := ss.waitSYNACK(st.id, s.synackTimeout); err != nil {
+		_ = st.Close()
+		_ = ss.Close()
+		return nil, err
+	}
+	return &clientPacketConn{PacketConn: newUOTPacketConn(st, target), session: ss}, nil
 }
 
 func (s *AnyTLS) newClientSession() (*session, error) {
@@ -102,6 +137,17 @@ type clientConn struct {
 
 func (c *clientConn) Close() error {
 	err := c.Conn.Close()
+	_ = c.session.Close()
+	return err
+}
+
+type clientPacketConn struct {
+	net.PacketConn
+	session *session
+}
+
+func (c *clientPacketConn) Close() error {
+	err := c.PacketConn.Close()
 	_ = c.session.Close()
 	return err
 }

@@ -52,11 +52,11 @@ we can set up local listeners as proxy servers, and forward requests to internet
 |HTTP           |√| |√| |client & server
 |SOCKS5         |√|√|√|√|client & server
 |SS             |√|√|√|√|client & server
-|Trojan         |√|√|√|√|client & server
-|Trojanc        |√|√|√|√|trojan cleartext(without tls)
-|AnyTLS         |√| |√| |client & server
-|AnyTLSc        |√| |√| |anytls cleartext(without tls)
-|VLESS          |√|√|√|√|client & server
+|Trojan         |√| |√|√|client & server
+|Trojanc        |√| |√|√|trojan cleartext(without tls)
+|AnyTLS         |√| |√|√|client & server
+|AnyTLSc        |√| |√|√|anytls cleartext(without tls)
+|VLESS          |√| |√|√|client & server
 |VMess          | | |√|√|client only
 |SSR            | | |√| |client only
 |SSH            | | |√| |client only

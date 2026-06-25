@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/pkg/socks"
@@ -127,6 +128,11 @@ func (s *AnyTLS) serveStream(ss *session, st *stream) {
 		log.F("[anytls] read target error: %v", err)
 		return
 	}
+	host, _, err := net.SplitHostPort(target.String())
+	if err == nil && host == uotV2MagicHost {
+		s.serveUoT(ss, st)
+		return
+	}
 
 	rc, dialer, err := s.proxy.Dial("tcp", target.String())
 	if err != nil {
@@ -142,6 +148,35 @@ func (s *AnyTLS) serveStream(ss *session, st *stream) {
 		log.F("[anytls] %s <-> %s via %s, relay error: %v", st.RemoteAddr(), target, dialer.Addr(), err)
 		if !strings.Contains(err.Error(), s.addr) {
 			s.proxy.Record(dialer, false)
+		}
+	}
+}
+
+func (s *AnyTLS) serveUoT(ss *session, st *stream) {
+	target, err := readUOTV2Request(st)
+	if err != nil {
+		_ = ss.writeFrame(frame{command: cmdSYNACK, streamID: st.id, data: []byte(err.Error())})
+		log.F("[anytls] read udp-over-tcp request error: %v", err)
+		return
+	}
+
+	dstPC, dialer, err := s.proxy.DialUDP("udp", target.String())
+	if err != nil {
+		_ = ss.writeFrame(frame{command: cmdSYNACK, streamID: st.id, data: []byte(err.Error())})
+		log.F("[anytls] %s <-UoT-> %s via %s, error in dial: %v", st.RemoteAddr(), target, dialer.Addr(), err)
+		return
+	}
+	defer dstPC.Close()
+
+	_ = ss.writeFrame(frame{command: cmdSYNACK, streamID: st.id})
+	pc := newUOTPacketConn(st, target)
+	log.F("[anytls] %s <-UoT-> %s via %s", st.RemoteAddr(), target, dialer.Addr())
+
+	go proxy.CopyUDP(dstPC, nil, pc, 2*time.Minute, 5*time.Second)
+	if err := proxy.CopyUDP(pc, nil, dstPC, 2*time.Minute, 5*time.Second); err != nil {
+		log.F("[anytls] %s <-UoT-> %s via %s, relay error: %v", st.RemoteAddr(), target, dialer.Addr(), err)
+		if d, ok := dialer.(proxy.Dialer); ok && !strings.Contains(err.Error(), s.addr) {
+			s.proxy.Record(d, false)
 		}
 	}
 }
