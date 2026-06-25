@@ -26,7 +26,7 @@ func encodeSettings(m map[string]string) []byte {
 
 func parseSettings(data []byte) map[string]string {
 	out := map[string]string{}
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if line == "" {
 			continue
 		}

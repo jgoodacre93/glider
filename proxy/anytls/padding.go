@@ -20,7 +20,7 @@ func parsePaddingScheme(raw string) (paddingScheme, error) {
 		raw = defaultPaddingScheme
 	}
 	ps := paddingScheme{raw: raw, authRange: [2]int{0, 0}}
-	for _, line := range strings.Split(raw, "\n") {
+	for line := range strings.SplitSeq(raw, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue

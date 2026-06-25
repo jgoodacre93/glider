@@ -49,10 +49,7 @@ func (st *stream) Write(p []byte) (int, error) {
 	}
 	written := 0
 	for len(p) > 0 {
-		n := len(p)
-		if n > maxFrameData {
-			n = maxFrameData
-		}
+		n := min(len(p), maxFrameData)
 		if err := st.s.writeFrame(frame{command: cmdPSH, streamID: st.id, data: p[:n]}); err != nil {
 			return written, err
 		}
